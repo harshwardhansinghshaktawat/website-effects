@@ -1,9 +1,9 @@
 /**
- * Wix Custom Element: Realistic Snowfall Effect
+ * Wix Custom Element: Optimized Realistic Snowfall Effect
  * Tag name: snowfall-effect
  * 
  * This custom element creates a beautiful, realistic snowfall effect
- * that covers the entire page when added to any Wix site.
+ * that covers the entire page with optimized performance.
  */
 
 class SnowfallEffect extends HTMLElement {
@@ -14,6 +14,7 @@ class SnowfallEffect extends HTMLElement {
     this.ctx = null;
     this.animationId = null;
     this.resizeTimeout = null;
+    this.isVisible = true;
   }
 
   connectedCallback() {
@@ -22,11 +23,12 @@ class SnowfallEffect extends HTMLElement {
     this.initializeSnowflakes();
     this.startAnimation();
     
-    // Handle window resize
-    window.addEventListener('resize', () => this.handleResize());
+    // Handle window resize with debouncing
+    this.handleResize = this.handleResize.bind(this);
+    window.addEventListener('resize', this.handleResize);
     
-    // Handle page scroll for parallax effect
-    window.addEventListener('scroll', () => this.handleScroll());
+    // Use Intersection Observer for better performance
+    this.setupVisibilityObserver();
   }
 
   disconnectedCallback() {
@@ -37,8 +39,11 @@ class SnowfallEffect extends HTMLElement {
     if (this.canvas && this.canvas.parentNode) {
       this.canvas.parentNode.removeChild(this.canvas);
     }
-    window.removeEventListener('resize', () => this.handleResize());
-    window.removeEventListener('scroll', () => this.handleScroll());
+    window.removeEventListener('resize', this.handleResize);
+    
+    if (this.visibilityObserver) {
+      this.visibilityObserver.disconnect();
+    }
   }
 
   createSnowfallCanvas() {
@@ -56,78 +61,90 @@ class SnowfallEffect extends HTMLElement {
     this.canvas.style.zIndex = '9999'; // Ensure it's on top
     this.canvas.style.opacity = '0.9';
     
-    // Set canvas dimensions
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
+    // Set canvas dimensions with device pixel ratio for crisp rendering
+    const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2 for performance
+    this.canvas.width = window.innerWidth * dpr;
+    this.canvas.height = window.innerHeight * dpr;
+    this.canvas.style.width = window.innerWidth + 'px';
+    this.canvas.style.height = window.innerHeight + 'px';
     
     // Get 2D context
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas.getContext('2d', {
+      alpha: true,
+      desynchronized: true // Better performance
+    });
+    
+    // Scale context to match device pixel ratio
+    this.ctx.scale(dpr, dpr);
     
     // Inject canvas into the body (not inside the custom element)
     document.body.appendChild(this.canvas);
   }
 
+  setupVisibilityObserver() {
+    // Pause animation when page is not visible to save resources
+    if ('hidden' in document) {
+      this.handleVisibilityChange = () => {
+        this.isVisible = !document.hidden;
+      };
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+  }
+
   initializeSnowflakes() {
-    // Create snowflakes with varied properties for realism
-    const snowflakeCount = Math.floor((window.innerWidth * window.innerHeight) / 8000);
+    // Adaptive snowflake count based on screen size and device capability
+    const screenArea = window.innerWidth * window.innerHeight;
+    const isMobile = window.innerWidth < 768;
+    const divisor = isMobile ? 15000 : 10000; // Fewer flakes on mobile
     
-    for (let i = 0; i < snowflakeCount; i++) {
+    const snowflakeCount = Math.floor(screenArea / divisor);
+    const maxSnowflakes = isMobile ? 50 : 100; // Cap for performance
+    
+    const finalCount = Math.min(snowflakeCount, maxSnowflakes);
+    
+    for (let i = 0; i < finalCount; i++) {
       this.snowflakes.push(this.createSnowflake());
     }
   }
 
   createSnowflake(isNew = false) {
-    const size = Math.random() * 4 + 1; // Size between 1-5px
-    const x = isNew ? Math.random() * this.canvas.width : Math.random() * this.canvas.width;
-    const y = isNew ? -10 : Math.random() * this.canvas.height;
+    const size = Math.random() * 3.5 + 1; // Size between 1-4.5px (slightly smaller)
+    const x = isNew ? Math.random() * window.innerWidth : Math.random() * window.innerWidth;
+    const y = isNew ? -10 : Math.random() * window.innerHeight;
     
     return {
       x: x,
       y: y,
       size: size,
-      speedY: Math.random() * 1 + 0.5, // Falling speed (0.5-1.5)
-      speedX: Math.random() * 0.5 - 0.25, // Horizontal drift (-0.25 to 0.25)
-      opacity: Math.random() * 0.6 + 0.4, // Opacity (0.4-1.0)
-      swing: Math.random() * 2, // Swinging motion amplitude
-      swingSpeed: Math.random() * 0.01 + 0.005, // Speed of swing
+      speedY: Math.random() * 0.8 + 0.4, // Falling speed (0.4-1.2) - slightly slower
+      speedX: Math.random() * 0.3 - 0.15, // Horizontal drift (-0.15 to 0.15)
+      opacity: Math.random() * 0.5 + 0.5, // Opacity (0.5-1.0)
+      swing: Math.random() * 1.5, // Swinging motion amplitude (reduced)
+      swingSpeed: Math.random() * 0.008 + 0.004, // Speed of swing (reduced)
       angle: Math.random() * Math.PI * 2, // Current swing angle
-      blur: size > 3 ? 1 : 0, // Larger snowflakes have slight blur
-      depth: Math.random() // For parallax effect (0-1, where 1 is closest)
+      depth: Math.random() * 0.5 + 0.5 // For parallax effect (0.5-1, where 1 is closest)
     };
   }
 
   drawSnowflake(snowflake) {
-    this.ctx.save();
-    
-    // Apply blur for depth effect on larger snowflakes
-    if (snowflake.blur > 0) {
-      this.ctx.filter = `blur(${snowflake.blur}px)`;
-    }
-    
-    // Set opacity
+    // Simple, efficient rendering
     this.ctx.globalAlpha = snowflake.opacity;
     
-    // Draw snowflake as a circle with gradient for more realistic look
-    const gradient = this.ctx.createRadialGradient(
-      snowflake.x, snowflake.y, 0,
-      snowflake.x, snowflake.y, snowflake.size
-    );
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.8)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.3)');
-    
-    this.ctx.fillStyle = gradient;
+    // Use simple circle for better performance
+    this.ctx.fillStyle = '#FFFFFF';
     this.ctx.beginPath();
     this.ctx.arc(snowflake.x, snowflake.y, snowflake.size, 0, Math.PI * 2);
     this.ctx.fill();
     
-    // Add a subtle sparkle effect for some snowflakes
-    if (snowflake.size > 2.5 && Math.random() > 0.98) {
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      this.ctx.fillRect(snowflake.x - 0.5, snowflake.y - 0.5, 1, 1);
+    // Add subtle glow for larger snowflakes only
+    if (snowflake.size > 3) {
+      this.ctx.globalAlpha = snowflake.opacity * 0.3;
+      this.ctx.beginPath();
+      this.ctx.arc(snowflake.x, snowflake.y, snowflake.size * 1.5, 0, Math.PI * 2);
+      this.ctx.fill();
     }
     
-    this.ctx.restore();
+    this.ctx.globalAlpha = 1;
   }
 
   updateSnowflake(snowflake) {
@@ -136,35 +153,40 @@ class SnowfallEffect extends HTMLElement {
     
     // Update position with swinging motion
     snowflake.y += snowflake.speedY * snowflake.depth;
-    snowflake.x += snowflake.speedX + Math.sin(snowflake.angle) * snowflake.swing * 0.1;
+    snowflake.x += snowflake.speedX + Math.sin(snowflake.angle) * snowflake.swing * 0.05;
     
-    // Add gentle wind effect
-    const wind = Math.sin(Date.now() * 0.0001) * 0.2;
-    snowflake.x += wind * snowflake.depth;
+    // Simplified wind effect (less computation)
+    snowflake.x += Math.sin(snowflake.angle * 0.5) * 0.1;
     
     // Reset snowflake when it goes off screen
-    if (snowflake.y > this.canvas.height + 10) {
+    if (snowflake.y > window.innerHeight + 10) {
       snowflake.y = -10;
-      snowflake.x = Math.random() * this.canvas.width;
+      snowflake.x = Math.random() * window.innerWidth;
     }
     
     // Wrap horizontally
-    if (snowflake.x > this.canvas.width + 10) {
+    if (snowflake.x > window.innerWidth + 10) {
       snowflake.x = -10;
     } else if (snowflake.x < -10) {
-      snowflake.x = this.canvas.width + 10;
+      snowflake.x = window.innerWidth + 10;
     }
   }
 
   animate() {
-    // Clear canvas
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    // Only animate if page is visible
+    if (!this.isVisible) {
+      this.animationId = requestAnimationFrame(() => this.animate());
+      return;
+    }
     
-    // Update and draw all snowflakes
-    this.snowflakes.forEach(snowflake => {
-      this.updateSnowflake(snowflake);
-      this.drawSnowflake(snowflake);
-    });
+    // Clear canvas efficiently
+    this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    
+    // Update and draw all snowflakes in one pass
+    for (let i = 0; i < this.snowflakes.length; i++) {
+      this.updateSnowflake(this.snowflakes[i]);
+      this.drawSnowflake(this.snowflakes[i]);
+    }
     
     // Continue animation
     this.animationId = requestAnimationFrame(() => this.animate());
@@ -175,14 +197,25 @@ class SnowfallEffect extends HTMLElement {
   }
 
   handleResize() {
-    // Debounce resize events
+    // Debounce resize events to prevent performance issues
     clearTimeout(this.resizeTimeout);
     this.resizeTimeout = setTimeout(() => {
-      this.canvas.width = window.innerWidth;
-      this.canvas.height = window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      
+      this.canvas.width = window.innerWidth * dpr;
+      this.canvas.height = window.innerHeight * dpr;
+      this.canvas.style.width = window.innerWidth + 'px';
+      this.canvas.style.height = window.innerHeight + 'px';
+      
+      this.ctx.scale(dpr, dpr);
       
       // Adjust snowflake count based on new screen size
-      const targetCount = Math.floor((window.innerWidth * window.innerHeight) / 8000);
+      const screenArea = window.innerWidth * window.innerHeight;
+      const isMobile = window.innerWidth < 768;
+      const divisor = isMobile ? 15000 : 10000;
+      const maxSnowflakes = isMobile ? 50 : 100;
+      
+      const targetCount = Math.min(Math.floor(screenArea / divisor), maxSnowflakes);
       const currentCount = this.snowflakes.length;
       
       if (targetCount > currentCount) {
@@ -192,18 +225,9 @@ class SnowfallEffect extends HTMLElement {
         }
       } else if (targetCount < currentCount) {
         // Remove excess snowflakes
-        this.snowflakes = this.snowflakes.slice(0, targetCount);
+        this.snowflakes.length = targetCount;
       }
     }, 250);
-  }
-
-  handleScroll() {
-    // Optional: Add subtle parallax effect based on scroll
-    const scrollY = window.scrollY;
-    this.snowflakes.forEach(snowflake => {
-      // Deeper snowflakes (higher depth value) move more with scroll
-      snowflake.y += scrollY * 0.0001 * snowflake.depth;
-    });
   }
 }
 
