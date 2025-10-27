@@ -1,31 +1,31 @@
 /**
- * Wix Custom Element: Holiday Cursor (Fixed Version)
+ * Wix Custom Element: Concentric Circles Cursor with Blend Mode
  * Tag name: holiday-cursor
  * 
- * Fixed: Proper mouse tracking, scroll handling, and blend mode visibility
+ * Two concentric circles that invert colors using CSS blend modes.
+ * Professional, clean design that works beautifully with any content.
  */
 
 class HolidayCursor extends HTMLElement {
   constructor() {
     super();
-    this.bigBall = null;
-    this.smallBall = null;
+    this.innerCircle = null;
+    this.outerCircle = null;
     this.mouseX = 0;
     this.mouseY = 0;
-    this.bigBallX = 0;
-    this.bigBallY = 0;
-    this.smallBallX = 0;
-    this.smallBallY = 0;
-    this.scale = 1;
-    this.targetScale = 1;
+    this.innerX = 0;
+    this.innerY = 0;
+    this.outerX = 0;
+    this.outerY = 0;
+    this.isHovering = false;
+    this.clickableElements = [];
     this.animationId = null;
-    this.hoverables = [];
   }
 
   connectedCallback() {
     this.createCursorElements();
     this.setupEventListeners();
-    this.detectHoverableElements();
+    this.detectClickableElements();
     this.startAnimation();
     this.setupMutationObserver();
   }
@@ -35,8 +35,12 @@ class HolidayCursor extends HTMLElement {
       cancelAnimationFrame(this.animationId);
     }
     
-    if (this.cursorContainer && this.cursorContainer.parentNode) {
-      this.cursorContainer.parentNode.removeChild(this.cursorContainer);
+    if (this.innerCircle && this.innerCircle.parentNode) {
+      this.innerCircle.parentNode.removeChild(this.innerCircle);
+    }
+    
+    if (this.outerCircle && this.outerCircle.parentNode) {
+      this.outerCircle.parentNode.removeChild(this.outerCircle);
     }
     
     if (this.mutationObserver) {
@@ -44,104 +48,85 @@ class HolidayCursor extends HTMLElement {
     }
     
     document.removeEventListener('mousemove', this.handleMouseMove);
+    document.removeEventListener('mousedown', this.handleMouseDown);
+    document.removeEventListener('mouseup', this.handleMouseUp);
     
     // Restore default cursor
     document.body.style.cursor = '';
-    const styleElement = document.getElementById('holiday-cursor-styles');
-    if (styleElement) {
-      styleElement.remove();
-    }
+    document.querySelectorAll('*').forEach(el => {
+      el.style.cursor = '';
+    });
   }
 
   createCursorElements() {
-    // Create styles
+    // Create inner circle (small, fast)
+    this.innerCircle = document.createElement('div');
+    this.innerCircle.id = 'cursor-inner-circle';
+    this.innerCircle.style.cssText = `
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      background-color: #fff;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 999999;
+      transform: translate(-50%, -50%);
+      mix-blend-mode: difference;
+      transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                  height 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    `;
+
+    // Create outer circle (large, slow with delay)
+    this.outerCircle = document.createElement('div');
+    this.outerCircle.id = 'cursor-outer-circle';
+    this.outerCircle.style.cssText = `
+      position: fixed;
+      width: 40px;
+      height: 40px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 999998;
+      transform: translate(-50%, -50%);
+      mix-blend-mode: difference;
+      transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                  height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                  border-width 0.3s ease;
+    `;
+
+    document.body.appendChild(this.innerCircle);
+    document.body.appendChild(this.outerCircle);
+    
+    // Hide default cursor
     const styleSheet = document.createElement('style');
-    styleSheet.id = 'holiday-cursor-styles';
     styleSheet.textContent = `
       * {
         cursor: none !important;
       }
       
-      .holiday-cursor-container {
-        pointer-events: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 999999;
-      }
-      
-      .holiday-cursor__ball {
-        position: fixed;
-        top: 0;
-        left: 0;
-        mix-blend-mode: difference;
-        will-change: transform;
-      }
-      
-      .holiday-cursor__ball circle {
-        transition: fill 0.3s ease;
-      }
-      
-      /* Normal state - Christmas colors that invert nicely */
-      .holiday-cursor__ball--big circle {
-        fill: #FFFFFF;
-      }
-      
-      .holiday-cursor__ball--small circle {
-        fill: #FFFFFF;
-      }
-      
-      /* Hover state - white for maximum visibility with blend mode */
-      .holiday-cursor__ball--big.hovering circle {
-        fill: #FFFFFF;
-      }
-      
-      .holiday-cursor__ball--small.hovering circle {
-        fill: #FFFFFF;
+      @keyframes cursorPulse {
+        0%, 100% {
+          transform: translate(-50%, -50%) scale(1);
+        }
+        50% {
+          transform: translate(-50%, -50%) scale(0.9);
+        }
       }
     `;
     document.head.appendChild(styleSheet);
-
-    // Create cursor container
-    this.cursorContainer = document.createElement('div');
-    this.cursorContainer.className = 'holiday-cursor-container';
-
-    // Create big ball (outer circle)
-    this.bigBall = document.createElement('div');
-    this.bigBall.className = 'holiday-cursor__ball holiday-cursor__ball--big';
-    this.bigBall.innerHTML = `
-      <svg height="40" width="40">
-        <circle cx="20" cy="20" r="16" stroke-width="0"></circle>
-      </svg>
-    `;
-
-    // Create small ball (inner dot)
-    this.smallBall = document.createElement('div');
-    this.smallBall.className = 'holiday-cursor__ball holiday-cursor__ball--small';
-    this.smallBall.innerHTML = `
-      <svg height="12" width="12">
-        <circle cx="6" cy="6" r="5" stroke-width="0"></circle>
-      </svg>
-    `;
-
-    this.cursorContainer.appendChild(this.bigBall);
-    this.cursorContainer.appendChild(this.smallBall);
-    document.body.appendChild(this.cursorContainer);
-
-    // Initialize positions off-screen
-    this.bigBall.style.transform = 'translate(-100px, -100px)';
-    this.smallBall.style.transform = 'translate(-100px, -100px)';
   }
 
   setupEventListeners() {
     this.handleMouseMove = this.onMouseMove.bind(this);
+    this.handleMouseDown = this.onMouseDown.bind(this);
+    this.handleMouseUp = this.onMouseUp.bind(this);
+
     document.addEventListener('mousemove', this.handleMouseMove, { passive: true });
+    document.addEventListener('mousedown', this.handleMouseDown);
+    document.addEventListener('mouseup', this.handleMouseUp);
   }
 
-  detectHoverableElements() {
-    // Common selectors for hoverable elements
+  detectClickableElements() {
     const selectors = [
       'a',
       'button',
@@ -154,31 +139,23 @@ class HolidayCursor extends HTMLElement {
       '.button',
       'label',
       'select',
-      '.hoverable'
+      'textarea',
+      'input[type="text"]',
+      'input[type="email"]',
+      'input[type="search"]'
     ];
 
-    // Remove old listeners
-    this.hoverables.forEach(el => {
-      if (el._hoverEnter) el.removeEventListener('mouseenter', el._hoverEnter);
-      if (el._hoverLeave) el.removeEventListener('mouseleave', el._hoverLeave);
-    });
-
-    // Get new hoverable elements
-    this.hoverables = document.querySelectorAll(selectors.join(', '));
+    this.clickableElements = document.querySelectorAll(selectors.join(', '));
     
-    // Add new listeners
-    this.hoverables.forEach(el => {
-      el._hoverEnter = () => this.onMouseHover();
-      el._hoverLeave = () => this.onMouseHoverOut();
-      
-      el.addEventListener('mouseenter', el._hoverEnter, { passive: true });
-      el.addEventListener('mouseleave', el._hoverLeave, { passive: true });
+    this.clickableElements.forEach(el => {
+      el.addEventListener('mouseenter', () => this.onElementHover(true), { passive: true });
+      el.addEventListener('mouseleave', () => this.onElementHover(false), { passive: true });
     });
   }
 
   setupMutationObserver() {
     this.mutationObserver = new MutationObserver(() => {
-      this.detectHoverableElements();
+      this.detectClickableElements();
     });
 
     this.mutationObserver.observe(document.body, {
@@ -188,58 +165,82 @@ class HolidayCursor extends HTMLElement {
   }
 
   onMouseMove(e) {
-    // Use clientX/clientY for viewport coordinates (not affected by scroll)
     this.mouseX = e.clientX;
     this.mouseY = e.clientY;
   }
 
-  onMouseHover() {
-    this.targetScale = 4;
-    
-    // Add hovering class for white color
-    this.bigBall.classList.add('hovering');
-    this.smallBall.classList.add('hovering');
+  onMouseDown() {
+    // Shrink both circles on click
+    this.innerCircle.style.width = '4px';
+    this.innerCircle.style.height = '4px';
+    this.outerCircle.style.width = '35px';
+    this.outerCircle.style.height = '35px';
+    this.outerCircle.style.borderWidth = '3px';
   }
 
-  onMouseHoverOut() {
-    this.targetScale = 1;
+  onMouseUp() {
+    // Return to normal or hover state
+    if (this.isHovering) {
+      this.innerCircle.style.width = '12px';
+      this.innerCircle.style.height = '12px';
+      this.outerCircle.style.width = '60px';
+      this.outerCircle.style.height = '60px';
+      this.outerCircle.style.borderWidth = '2px';
+    } else {
+      this.innerCircle.style.width = '8px';
+      this.innerCircle.style.height = '8px';
+      this.outerCircle.style.width = '40px';
+      this.outerCircle.style.height = '40px';
+      this.outerCircle.style.borderWidth = '2px';
+    }
+  }
+
+  onElementHover(isEntering) {
+    this.isHovering = isEntering;
     
-    // Remove hovering class
-    this.bigBall.classList.remove('hovering');
-    this.smallBall.classList.remove('hovering');
+    if (isEntering) {
+      // Expand on hover
+      this.innerCircle.style.width = '12px';
+      this.innerCircle.style.height = '12px';
+      this.outerCircle.style.width = '60px';
+      this.outerCircle.style.height = '60px';
+    } else {
+      // Return to normal
+      this.innerCircle.style.width = '8px';
+      this.innerCircle.style.height = '8px';
+      this.outerCircle.style.width = '40px';
+      this.outerCircle.style.height = '40px';
+    }
   }
 
   animate() {
-    // Smooth easing for cursor movement
-    const bigEase = 0.15;
-    const smallEase = 0.25;
-    const scaleEase = 0.15;
-
-    // Update positions with easing
-    this.bigBallX += (this.mouseX - this.bigBallX) * bigEase;
-    this.bigBallY += (this.mouseY - this.bigBallY) * bigEase;
+    // Smooth easing with different speeds for depth effect
+    const innerEase = 0.2;  // Fast and responsive
+    const outerEase = 0.1;  // Slower, creates elastic lag effect
     
-    this.smallBallX += (this.mouseX - this.smallBallX) * smallEase;
-    this.smallBallY += (this.mouseY - this.smallBallY) * smallEase;
+    // Update inner circle position (fast)
+    this.innerX += (this.mouseX - this.innerX) * innerEase;
+    this.innerY += (this.mouseY - this.innerY) * innerEase;
     
-    // Update scale with easing
-    this.scale += (this.targetScale - this.scale) * scaleEase;
+    // Update outer circle position (slow, smooth lag)
+    this.outerX += (this.mouseX - this.outerX) * outerEase;
+    this.outerY += (this.mouseY - this.outerY) * outerEase;
 
-    // Apply transforms - using translate3d for better performance
-    // Subtract half of SVG size to center the cursor
-    this.bigBall.style.transform = `translate3d(${this.bigBallX - 20}px, ${this.bigBallY - 20}px, 0) scale(${this.scale})`;
-    this.smallBall.style.transform = `translate3d(${this.smallBallX - 6}px, ${this.smallBallY - 6}px, 0)`;
+    // Apply positions
+    this.innerCircle.style.left = this.innerX + 'px';
+    this.innerCircle.style.top = this.innerY + 'px';
+    this.outerCircle.style.left = this.outerX + 'px';
+    this.outerCircle.style.top = this.outerY + 'px';
 
-    // Continue animation loop
     this.animationId = requestAnimationFrame(() => this.animate());
   }
 
   startAnimation() {
-    // Initialize positions to current mouse position (or center if not set)
-    this.bigBallX = this.mouseX || window.innerWidth / 2;
-    this.bigBallY = this.mouseY || window.innerHeight / 2;
-    this.smallBallX = this.mouseX || window.innerWidth / 2;
-    this.smallBallY = this.mouseY || window.innerHeight / 2;
+    // Initialize positions
+    this.innerX = this.mouseX;
+    this.innerY = this.mouseY;
+    this.outerX = this.mouseX;
+    this.outerY = this.mouseY;
     
     this.animate();
   }
