@@ -1,38 +1,32 @@
 /**
- * Wix Custom Element: Beautiful Holiday Cursor
+ * Wix Custom Element: Holiday Cursor (SVG Design)
  * Tag name: holiday-cursor
  * 
- * Professional cursor design with smooth circles, Christmas colors,
- * magnetic effects, and elegant animations inspired by modern web design.
+ * Based on modern cursor design with SVG circles,
+ * blend mode effects, and Christmas holiday colors.
  */
 
 class HolidayCursor extends HTMLElement {
   constructor() {
     super();
-    this.cursorDot = null;
-    this.cursorCircle = null;
-    this.particles = [];
+    this.bigBall = null;
+    this.smallBall = null;
     this.mouseX = 0;
     this.mouseY = 0;
-    this.dotX = 0;
-    this.dotY = 0;
-    this.circleX = 0;
-    this.circleY = 0;
-    this.isHovering = false;
-    this.isClicking = false;
-    this.clickableElements = [];
+    this.bigBallX = 0;
+    this.bigBallY = 0;
+    this.smallBallX = 0;
+    this.smallBallY = 0;
+    this.scale = 1;
+    this.targetScale = 1;
     this.animationId = null;
-    this.particleCanvas = null;
-    this.particleCtx = null;
-    this.lastParticleTime = 0;
-    this.currentHoverElement = null;
+    this.hoverables = [];
   }
 
   connectedCallback() {
     this.createCursorElements();
-    this.createParticleCanvas();
     this.setupEventListeners();
-    this.detectClickableElements();
+    this.detectHoverableElements();
     this.startAnimation();
     this.setupMutationObserver();
   }
@@ -42,16 +36,8 @@ class HolidayCursor extends HTMLElement {
       cancelAnimationFrame(this.animationId);
     }
     
-    if (this.cursorDot && this.cursorDot.parentNode) {
-      this.cursorDot.parentNode.removeChild(this.cursorDot);
-    }
-    
-    if (this.cursorCircle && this.cursorCircle.parentNode) {
-      this.cursorCircle.parentNode.removeChild(this.cursorCircle);
-    }
-    
-    if (this.particleCanvas && this.particleCanvas.parentNode) {
-      this.particleCanvas.parentNode.removeChild(this.particleCanvas);
+    if (this.cursorContainer && this.cursorContainer.parentNode) {
+      this.cursorContainer.parentNode.removeChild(this.cursorContainer);
     }
     
     if (this.mutationObserver) {
@@ -59,151 +45,127 @@ class HolidayCursor extends HTMLElement {
     }
     
     document.removeEventListener('mousemove', this.handleMouseMove);
-    document.removeEventListener('mousedown', this.handleMouseDown);
-    document.removeEventListener('mouseup', this.handleMouseUp);
-    document.removeEventListener('click', this.handleClick);
     
     // Restore default cursor
     document.body.style.cursor = '';
-    document.querySelectorAll('*').forEach(el => {
-      el.style.cursor = '';
-    });
+    const styleElement = document.getElementById('holiday-cursor-styles');
+    if (styleElement) {
+      styleElement.remove();
+    }
   }
 
   createCursorElements() {
-    // Create inner dot (small, fast-following)
-    this.cursorDot = document.createElement('div');
-    this.cursorDot.id = 'holiday-cursor-dot';
-    this.cursorDot.style.cssText = `
-      position: fixed;
-      width: 10px;
-      height: 10px;
-      background: #C41E3A;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 999999;
-      transform: translate(-50%, -50%);
-      transition: width 0.2s ease, height 0.2s ease, background 0.2s ease;
-      mix-blend-mode: difference;
-    `;
-
-    // Create outer circle (large, smooth-following with delay)
-    this.cursorCircle = document.createElement('div');
-    this.cursorCircle.id = 'holiday-cursor-circle';
-    this.cursorCircle.style.cssText = `
-      position: fixed;
-      width: 40px;
-      height: 40px;
-      border: 2px solid #165B33;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 999998;
-      transform: translate(-50%, -50%);
-      transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-                  height 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-                  border-color 0.3s ease,
-                  border-width 0.3s ease,
-                  opacity 0.3s ease;
-      opacity: 0.8;
-    `;
-
-    document.body.appendChild(this.cursorDot);
-    document.body.appendChild(this.cursorCircle);
-    
-    // Hide default cursor
+    // Create styles
     const styleSheet = document.createElement('style');
+    styleSheet.id = 'holiday-cursor-styles';
     styleSheet.textContent = `
       * {
         cursor: none !important;
       }
       
-      @keyframes particleFade {
-        0% {
-          opacity: 1;
-          transform: scale(1);
-        }
-        100% {
-          opacity: 0;
-          transform: scale(0);
-        }
+      .holiday-cursor-container {
+        pointer-events: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 999999;
       }
       
-      @keyframes clickRipple {
-        0% {
-          transform: translate(-50%, -50%) scale(0.5);
-          opacity: 1;
-        }
-        100% {
-          transform: translate(-50%, -50%) scale(2);
-          opacity: 0;
-        }
+      .holiday-cursor__ball {
+        position: fixed;
+        top: 0;
+        left: 0;
+        mix-blend-mode: difference;
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      
+      .holiday-cursor__ball circle {
+        transition: fill 0.3s ease;
+      }
+      
+      .holiday-cursor__ball--big circle {
+        fill: #C41E3A;
+      }
+      
+      .holiday-cursor__ball--small circle {
+        fill: #165B33;
       }
     `;
     document.head.appendChild(styleSheet);
-  }
 
-  createParticleCanvas() {
-    this.particleCanvas = document.createElement('canvas');
-    this.particleCanvas.id = 'holiday-particle-canvas';
-    this.particleCanvas.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 999997;
+    // Create cursor container
+    this.cursorContainer = document.createElement('div');
+    this.cursorContainer.className = 'holiday-cursor-container';
+
+    // Create big ball (outer circle)
+    this.bigBall = document.createElement('div');
+    this.bigBall.className = 'holiday-cursor__ball holiday-cursor__ball--big';
+    this.bigBall.innerHTML = `
+      <svg height="40" width="40">
+        <circle cx="20" cy="20" r="16" stroke-width="0"></circle>
+      </svg>
     `;
-    
-    this.particleCanvas.width = window.innerWidth;
-    this.particleCanvas.height = window.innerHeight;
-    this.particleCtx = this.particleCanvas.getContext('2d', { alpha: true });
-    
-    document.body.appendChild(this.particleCanvas);
-    
-    window.addEventListener('resize', () => {
-      this.particleCanvas.width = window.innerWidth;
-      this.particleCanvas.height = window.innerHeight;
-    });
+
+    // Create small ball (inner dot)
+    this.smallBall = document.createElement('div');
+    this.smallBall.className = 'holiday-cursor__ball holiday-cursor__ball--small';
+    this.smallBall.innerHTML = `
+      <svg height="12" width="12">
+        <circle cx="6" cy="6" r="5" stroke-width="0"></circle>
+      </svg>
+    `;
+
+    this.cursorContainer.appendChild(this.bigBall);
+    this.cursorContainer.appendChild(this.smallBall);
+    document.body.appendChild(this.cursorContainer);
   }
 
   setupEventListeners() {
     this.handleMouseMove = this.onMouseMove.bind(this);
-    this.handleMouseDown = this.onMouseDown.bind(this);
-    this.handleMouseUp = this.onMouseUp.bind(this);
-    this.handleClick = this.onClick.bind(this);
-
     document.addEventListener('mousemove', this.handleMouseMove, { passive: true });
-    document.addEventListener('mousedown', this.handleMouseDown);
-    document.addEventListener('mouseup', this.handleMouseUp);
-    document.addEventListener('click', this.handleClick);
   }
 
-  detectClickableElements() {
+  detectHoverableElements() {
+    // Common selectors for hoverable elements
     const selectors = [
       'a',
       'button',
       'input[type="button"]',
       'input[type="submit"]',
+      'input[type="reset"]',
       '[role="button"]',
       '[onclick]',
       '.btn',
       '.button',
       'label',
-      'select'
+      'select',
+      '.hoverable'
     ];
 
-    this.clickableElements = document.querySelectorAll(selectors.join(', '));
+    // Remove old listeners
+    this.hoverables.forEach(el => {
+      if (el._hoverEnter) el.removeEventListener('mouseenter', el._hoverEnter);
+      if (el._hoverLeave) el.removeEventListener('mouseleave', el._hoverLeave);
+    });
+
+    // Get new hoverable elements
+    this.hoverables = document.querySelectorAll(selectors.join(', '));
     
-    this.clickableElements.forEach(el => {
-      el.addEventListener('mouseenter', () => this.onElementHover(el, true), { passive: true });
-      el.addEventListener('mouseleave', () => this.onElementHover(el, false), { passive: true });
+    // Add new listeners
+    this.hoverables.forEach(el => {
+      el._hoverEnter = () => this.onMouseHover();
+      el._hoverLeave = () => this.onMouseHoverOut();
+      
+      el.addEventListener('mouseenter', el._hoverEnter, { passive: true });
+      el.addEventListener('mouseleave', el._hoverLeave, { passive: true });
     });
   }
 
   setupMutationObserver() {
     this.mutationObserver = new MutationObserver(() => {
-      this.detectClickableElements();
+      this.detectHoverableElements();
     });
 
     this.mutationObserver.observe(document.body, {
@@ -213,275 +175,62 @@ class HolidayCursor extends HTMLElement {
   }
 
   onMouseMove(e) {
-    this.mouseX = e.clientX;
-    this.mouseY = e.clientY;
-
-    // Create sparkle trail (less frequent for subtlety)
-    const now = Date.now();
-    if (now - this.lastParticleTime > 80 && !this.isClicking) {
-      this.createSparkle(this.mouseX, this.mouseY);
-      this.lastParticleTime = now;
-    }
-
-    // Magnetic effect
-    if (this.currentHoverElement) {
-      this.applyMagneticEffect();
-    }
+    this.mouseX = e.pageX;
+    this.mouseY = e.pageY;
   }
 
-  onMouseDown() {
-    this.isClicking = true;
+  onMouseHover() {
+    this.targetScale = 4;
     
-    // Shrink dot
-    this.cursorDot.style.width = '6px';
-    this.cursorDot.style.height = '6px';
-    this.cursorDot.style.background = '#165B33'; // Green on click
+    // Change colors on hover for visual feedback
+    const bigCircle = this.bigBall.querySelector('circle');
+    const smallCircle = this.smallBall.querySelector('circle');
     
-    // Shrink circle
-    this.cursorCircle.style.width = '35px';
-    this.cursorCircle.style.height = '35px';
-    this.cursorCircle.style.borderWidth = '3px';
-    this.cursorCircle.style.borderColor = '#C41E3A'; // Red border on click
+    bigCircle.style.fill = '#FFD700'; // Gold on hover
+    smallCircle.style.fill = '#C41E3A'; // Red on hover
   }
 
-  onMouseUp() {
-    this.isClicking = false;
+  onMouseHoverOut() {
+    this.targetScale = 1;
     
-    // Reset to hover state or normal state
-    if (this.isHovering) {
-      this.cursorDot.style.width = '14px';
-      this.cursorDot.style.height = '14px';
-      this.cursorDot.style.background = '#C41E3A';
-    } else {
-      this.cursorDot.style.width = '10px';
-      this.cursorDot.style.height = '10px';
-      this.cursorDot.style.background = '#C41E3A';
-    }
+    // Reset colors
+    const bigCircle = this.bigBall.querySelector('circle');
+    const smallCircle = this.smallBall.querySelector('circle');
     
-    this.cursorCircle.style.width = this.isHovering ? '70px' : '40px';
-    this.cursorCircle.style.height = this.isHovering ? '70px' : '40px';
-    this.cursorCircle.style.borderWidth = '2px';
-    this.cursorCircle.style.borderColor = '#165B33';
-  }
-
-  onClick(e) {
-    // Create elegant click ripple
-    this.createClickRipple(e.clientX, e.clientY);
-  }
-
-  onElementHover(element, isEntering) {
-    this.isHovering = isEntering;
-    this.currentHoverElement = isEntering ? element : null;
-    
-    if (isEntering) {
-      // Expand and change colors on hover
-      this.cursorDot.style.width = '14px';
-      this.cursorDot.style.height = '14px';
-      this.cursorDot.style.background = '#C41E3A'; // Christmas red
-      
-      this.cursorCircle.style.width = '70px';
-      this.cursorCircle.style.height = '70px';
-      this.cursorCircle.style.borderColor = '#165B33'; // Forest green
-      this.cursorCircle.style.borderWidth = '2px';
-      this.cursorCircle.style.opacity = '1';
-    } else {
-      // Return to normal state
-      this.cursorDot.style.width = '10px';
-      this.cursorDot.style.height = '10px';
-      this.cursorDot.style.background = '#C41E3A';
-      
-      this.cursorCircle.style.width = '40px';
-      this.cursorCircle.style.height = '40px';
-      this.cursorCircle.style.borderColor = '#165B33';
-      this.cursorCircle.style.borderWidth = '2px';
-      this.cursorCircle.style.opacity = '0.8';
-    }
-  }
-
-  applyMagneticEffect() {
-    if (!this.currentHoverElement) return;
-
-    const rect = this.currentHoverElement.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    
-    const distance = Math.sqrt(
-      Math.pow(this.mouseX - centerX, 2) + 
-      Math.pow(this.mouseY - centerY, 2)
-    );
-
-    const magnetRadius = 80;
-    
-    if (distance < magnetRadius) {
-      const force = Math.max(0, (magnetRadius - distance) / magnetRadius);
-      const pullStrength = 0.2;
-      
-      this.dotX = this.mouseX + (centerX - this.mouseX) * force * pullStrength;
-      this.dotY = this.mouseY + (centerY - this.mouseY) * force * pullStrength;
-    }
-  }
-
-  createSparkle(x, y) {
-    // Christmas color palette
-    const colors = [
-      '#C41E3A', // Christmas red
-      '#165B33', // Forest green
-      '#FFD700', // Gold
-      '#FFFFFF', // White
-      '#146B3A', // Emerald green
-      '#BB2528'  // Dark red
-    ];
-
-    const particle = {
-      x: x + (Math.random() - 0.5) * 20,
-      y: y + (Math.random() - 0.5) * 20,
-      vx: (Math.random() - 0.5) * 1.5,
-      vy: (Math.random() - 0.5) * 1.5 - 0.5,
-      size: Math.random() * 2.5 + 1,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      life: 1.0,
-      decay: Math.random() * 0.015 + 0.01
-    };
-
-    this.particles.push(particle);
-  }
-
-  createClickRipple(x, y) {
-    // Create elegant click burst
-    const burst = 8;
-    for (let i = 0; i < burst; i++) {
-      const angle = (Math.PI * 2 * i) / burst;
-      const speed = Math.random() * 2 + 1.5;
-      
-      const particle = {
-        x: x,
-        y: y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        size: Math.random() * 3 + 2,
-        color: i % 2 === 0 ? '#C41E3A' : '#165B33',
-        life: 1.0,
-        decay: 0.025
-      };
-      
-      this.particles.push(particle);
-    }
-
-    // Create expanding circle ripple
-    const ripple = document.createElement('div');
-    ripple.style.cssText = `
-      position: fixed;
-      left: ${x}px;
-      top: ${y}px;
-      width: 30px;
-      height: 30px;
-      border: 2px solid #C41E3A;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 999996;
-      animation: clickRipple 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-      opacity: 0.8;
-    `;
-    
-    document.body.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 600);
-
-    // Secondary green ripple
-    const ripple2 = document.createElement('div');
-    ripple2.style.cssText = `
-      position: fixed;
-      left: ${x}px;
-      top: ${y}px;
-      width: 30px;
-      height: 30px;
-      border: 2px solid #165B33;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 999995;
-      animation: clickRipple 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-      opacity: 0.6;
-      animation-delay: 0.1s;
-    `;
-    
-    document.body.appendChild(ripple2);
-    setTimeout(() => ripple2.remove(), 900);
-  }
-
-  updateParticles() {
-    this.particleCtx.clearRect(0, 0, this.particleCanvas.width, this.particleCanvas.height);
-
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
-      
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.08; // Subtle gravity
-      p.life -= p.decay;
-
-      if (p.life <= 0) {
-        this.particles.splice(i, 1);
-        continue;
-      }
-
-      // Draw particle with glow
-      this.particleCtx.save();
-      this.particleCtx.globalAlpha = p.life;
-      
-      // Outer glow
-      const gradient = this.particleCtx.createRadialGradient(
-        p.x, p.y, 0,
-        p.x, p.y, p.size * 2
-      );
-      gradient.addColorStop(0, p.color);
-      gradient.addColorStop(0.5, p.color + '80');
-      gradient.addColorStop(1, 'transparent');
-      
-      this.particleCtx.fillStyle = gradient;
-      this.particleCtx.beginPath();
-      this.particleCtx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
-      this.particleCtx.fill();
-      
-      // Inner bright core
-      this.particleCtx.fillStyle = p.color;
-      this.particleCtx.beginPath();
-      this.particleCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      this.particleCtx.fill();
-      
-      this.particleCtx.restore();
-    }
+    bigCircle.style.fill = '#C41E3A'; // Red (Christmas)
+    smallCircle.style.fill = '#165B33'; // Green (Forest)
   }
 
   animate() {
-    // Smooth easing for cursor elements
-    const dotEase = 0.18; // Fast following for dot
-    const circleEase = 0.08; // Slower, elastic following for circle
+    // Smooth easing for cursor movement
+    const bigEase = 0.15;
+    const smallEase = 0.25;
+    const scaleEase = 0.15;
+
+    // Update positions with easing
+    this.bigBallX += (this.mouseX - this.bigBallX) * bigEase;
+    this.bigBallY += (this.mouseY - this.bigBallY) * bigEase;
     
-    // Update dot position (fast, responsive)
-    this.dotX += (this.mouseX - this.dotX) * dotEase;
-    this.dotY += (this.mouseY - this.dotY) * dotEase;
+    this.smallBallX += (this.mouseX - this.smallBallX) * smallEase;
+    this.smallBallY += (this.mouseY - this.smallBallY) * smallEase;
     
-    // Update circle position (slow, smooth)
-    this.circleX += (this.mouseX - this.circleX) * circleEase;
-    this.circleY += (this.mouseY - this.circleY) * circleEase;
+    // Update scale with easing
+    this.scale += (this.targetScale - this.scale) * scaleEase;
 
-    // Apply positions
-    this.cursorDot.style.left = this.dotX + 'px';
-    this.cursorDot.style.top = this.dotY + 'px';
-    this.cursorCircle.style.left = this.circleX + 'px';
-    this.cursorCircle.style.top = this.circleY + 'px';
+    // Apply transforms
+    this.bigBall.style.transform = `translate(${this.bigBallX - 20}px, ${this.bigBallY - 20}px) scale(${this.scale})`;
+    this.smallBall.style.transform = `translate(${this.smallBallX - 6}px, ${this.smallBallY - 6}px)`;
 
-    // Update particles
-    this.updateParticles();
-
+    // Continue animation loop
     this.animationId = requestAnimationFrame(() => this.animate());
   }
 
   startAnimation() {
-    // Initialize positions
-    this.dotX = this.mouseX;
-    this.dotY = this.mouseY;
-    this.circleX = this.mouseX;
-    this.circleY = this.mouseY;
+    // Initialize positions to avoid jump on load
+    this.bigBallX = this.mouseX;
+    this.bigBallY = this.mouseY;
+    this.smallBallX = this.mouseX;
+    this.smallBallY = this.mouseY;
     
     this.animate();
   }
