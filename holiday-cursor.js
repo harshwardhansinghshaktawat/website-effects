@@ -1,23 +1,23 @@
 /**
- * Wix Custom Element: Holiday Mouse Effect
+ * Wix Custom Element: Beautiful Holiday Cursor
  * Tag name: holiday-cursor
  * 
- * This custom element creates beautiful holiday-themed cursor effects
- * with automatic detection of clickable elements, sparkle trails,
- * magnetic hover effects, and festive animations.
+ * Professional cursor design with smooth circles, Christmas colors,
+ * magnetic effects, and elegant animations inspired by modern web design.
  */
 
 class HolidayCursor extends HTMLElement {
   constructor() {
     super();
-    this.cursor = null;
     this.cursorDot = null;
-    this.cursorRing = null;
+    this.cursorCircle = null;
     this.particles = [];
     this.mouseX = 0;
     this.mouseY = 0;
-    this.cursorX = 0;
-    this.cursorY = 0;
+    this.dotX = 0;
+    this.dotY = 0;
+    this.circleX = 0;
+    this.circleY = 0;
     this.isHovering = false;
     this.isClicking = false;
     this.clickableElements = [];
@@ -25,7 +25,7 @@ class HolidayCursor extends HTMLElement {
     this.particleCanvas = null;
     this.particleCtx = null;
     this.lastParticleTime = 0;
-    this.magneticElement = null;
+    this.currentHoverElement = null;
   }
 
   connectedCallback() {
@@ -34,19 +34,20 @@ class HolidayCursor extends HTMLElement {
     this.setupEventListeners();
     this.detectClickableElements();
     this.startAnimation();
-    
-    // Observe DOM changes to detect new clickable elements
     this.setupMutationObserver();
   }
 
   disconnectedCallback() {
-    // Clean up
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
     
-    if (this.cursor && this.cursor.parentNode) {
-      this.cursor.parentNode.removeChild(this.cursor);
+    if (this.cursorDot && this.cursorDot.parentNode) {
+      this.cursorDot.parentNode.removeChild(this.cursorDot);
+    }
+    
+    if (this.cursorCircle && this.cursorCircle.parentNode) {
+      this.cursorCircle.parentNode.removeChild(this.cursorCircle);
     }
     
     if (this.particleCanvas && this.particleCanvas.parentNode) {
@@ -57,89 +58,88 @@ class HolidayCursor extends HTMLElement {
       this.mutationObserver.disconnect();
     }
     
-    // Remove event listeners
     document.removeEventListener('mousemove', this.handleMouseMove);
     document.removeEventListener('mousedown', this.handleMouseDown);
     document.removeEventListener('mouseup', this.handleMouseUp);
     document.removeEventListener('click', this.handleClick);
+    
+    // Restore default cursor
+    document.body.style.cursor = '';
+    document.querySelectorAll('*').forEach(el => {
+      el.style.cursor = '';
+    });
   }
 
   createCursorElements() {
-    // Create main cursor container
-    this.cursor = document.createElement('div');
-    this.cursor.id = 'holiday-cursor-container';
-    this.cursor.style.cssText = `
-      position: fixed;
-      pointer-events: none;
-      z-index: 99999;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      mix-blend-mode: normal;
-    `;
-
-    // Create cursor dot (center point)
+    // Create inner dot (small, fast-following)
     this.cursorDot = document.createElement('div');
     this.cursorDot.id = 'holiday-cursor-dot';
     this.cursorDot.style.cssText = `
-      position: absolute;
-      width: 8px;
-      height: 8px;
-      background: linear-gradient(135deg, #ff6b6b, #ffd700);
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      background: #C41E3A;
       border-radius: 50%;
+      pointer-events: none;
+      z-index: 999999;
       transform: translate(-50%, -50%);
-      transition: transform 0.15s ease, opacity 0.15s ease;
-      box-shadow: 0 0 10px rgba(255, 215, 0, 0.6),
-                  0 0 20px rgba(255, 107, 107, 0.4);
+      transition: width 0.2s ease, height 0.2s ease, background 0.2s ease;
+      mix-blend-mode: difference;
     `;
 
-    // Create cursor ring (outer circle)
-    this.cursorRing = document.createElement('div');
-    this.cursorRing.id = 'holiday-cursor-ring';
-    this.cursorRing.style.cssText = `
-      position: absolute;
+    // Create outer circle (large, smooth-following with delay)
+    this.cursorCircle = document.createElement('div');
+    this.cursorCircle.id = 'holiday-cursor-circle';
+    this.cursorCircle.style.cssText = `
+      position: fixed;
       width: 40px;
       height: 40px;
-      border: 2px solid;
-      border-image: linear-gradient(135deg, #ff6b6b, #ffd700, #4ecdc4, #ff6b6b) 1;
+      border: 2px solid #165B33;
       border-radius: 50%;
+      pointer-events: none;
+      z-index: 999998;
       transform: translate(-50%, -50%);
-      transition: width 0.3s ease, height 0.3s ease, border-width 0.3s ease;
-      animation: ringRotate 3s linear infinite;
+      transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                  height 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                  border-color 0.3s ease,
+                  border-width 0.3s ease,
+                  opacity 0.3s ease;
+      opacity: 0.8;
     `;
 
-    // Add rotation animation
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes ringRotate {
-        0% { transform: translate(-50%, -50%) rotate(0deg); }
-        100% { transform: translate(-50%, -50%) rotate(360deg); }
-      }
-      
-      @keyframes sparkle {
-        0%, 100% { opacity: 0; transform: scale(0); }
-        50% { opacity: 1; transform: scale(1); }
-      }
-      
-      @keyframes clickPulse {
-        0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-        100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
-      }
-    `;
-    document.head.appendChild(style);
-
-    this.cursor.appendChild(this.cursorDot);
-    this.cursor.appendChild(this.cursorRing);
-    document.body.appendChild(this.cursor);
+    document.body.appendChild(this.cursorDot);
+    document.body.appendChild(this.cursorCircle);
     
     // Hide default cursor
-    document.body.style.cursor = 'none';
-    document.querySelectorAll('*').forEach(el => {
-      if (el !== this.cursor && !this.cursor.contains(el)) {
-        el.style.cursor = 'none';
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+      * {
+        cursor: none !important;
       }
-    });
+      
+      @keyframes particleFade {
+        0% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(0);
+        }
+      }
+      
+      @keyframes clickRipple {
+        0% {
+          transform: translate(-50%, -50%) scale(0.5);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(2);
+          opacity: 0;
+        }
+      }
+    `;
+    document.head.appendChild(styleSheet);
   }
 
   createParticleCanvas() {
@@ -152,16 +152,15 @@ class HolidayCursor extends HTMLElement {
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 99998;
+      z-index: 999997;
     `;
     
     this.particleCanvas.width = window.innerWidth;
     this.particleCanvas.height = window.innerHeight;
-    this.particleCtx = this.particleCanvas.getContext('2d');
+    this.particleCtx = this.particleCanvas.getContext('2d', { alpha: true });
     
     document.body.appendChild(this.particleCanvas);
     
-    // Handle resize
     window.addEventListener('resize', () => {
       this.particleCanvas.width = window.innerWidth;
       this.particleCanvas.height = window.innerHeight;
@@ -181,7 +180,6 @@ class HolidayCursor extends HTMLElement {
   }
 
   detectClickableElements() {
-    // Select all clickable elements
     const selectors = [
       'a',
       'button',
@@ -189,14 +187,14 @@ class HolidayCursor extends HTMLElement {
       'input[type="submit"]',
       '[role="button"]',
       '[onclick]',
-      '.clickable',
+      '.btn',
+      '.button',
       'label',
       'select'
     ];
 
     this.clickableElements = document.querySelectorAll(selectors.join(', '));
     
-    // Add hover listeners to clickable elements
     this.clickableElements.forEach(el => {
       el.addEventListener('mouseenter', () => this.onElementHover(el, true), { passive: true });
       el.addEventListener('mouseleave', () => this.onElementHover(el, false), { passive: true });
@@ -204,7 +202,6 @@ class HolidayCursor extends HTMLElement {
   }
 
   setupMutationObserver() {
-    // Watch for DOM changes to detect new clickable elements
     this.mutationObserver = new MutationObserver(() => {
       this.detectClickableElements();
     });
@@ -219,167 +216,195 @@ class HolidayCursor extends HTMLElement {
     this.mouseX = e.clientX;
     this.mouseY = e.clientY;
 
-    // Create sparkle trail
+    // Create sparkle trail (less frequent for subtlety)
     const now = Date.now();
-    if (now - this.lastParticleTime > 50) { // Create particle every 50ms
+    if (now - this.lastParticleTime > 80 && !this.isClicking) {
       this.createSparkle(this.mouseX, this.mouseY);
       this.lastParticleTime = now;
     }
 
-    // Check for magnetic effect on hoverable elements
-    this.checkMagneticEffect(e);
+    // Magnetic effect
+    if (this.currentHoverElement) {
+      this.applyMagneticEffect();
+    }
   }
 
   onMouseDown() {
     this.isClicking = true;
     
-    // Scale down cursor
-    this.cursorDot.style.transform = 'translate(-50%, -50%) scale(0.8)';
-    this.cursorRing.style.width = '35px';
-    this.cursorRing.style.height = '35px';
-    this.cursorRing.style.borderWidth = '3px';
+    // Shrink dot
+    this.cursorDot.style.width = '6px';
+    this.cursorDot.style.height = '6px';
+    this.cursorDot.style.background = '#165B33'; // Green on click
+    
+    // Shrink circle
+    this.cursorCircle.style.width = '35px';
+    this.cursorCircle.style.height = '35px';
+    this.cursorCircle.style.borderWidth = '3px';
+    this.cursorCircle.style.borderColor = '#C41E3A'; // Red border on click
   }
 
   onMouseUp() {
     this.isClicking = false;
     
-    // Reset cursor
-    if (!this.isHovering) {
-      this.cursorDot.style.transform = 'translate(-50%, -50%) scale(1)';
-      this.cursorRing.style.width = '40px';
-      this.cursorRing.style.height = '40px';
-      this.cursorRing.style.borderWidth = '2px';
+    // Reset to hover state or normal state
+    if (this.isHovering) {
+      this.cursorDot.style.width = '14px';
+      this.cursorDot.style.height = '14px';
+      this.cursorDot.style.background = '#C41E3A';
+    } else {
+      this.cursorDot.style.width = '10px';
+      this.cursorDot.style.height = '10px';
+      this.cursorDot.style.background = '#C41E3A';
     }
+    
+    this.cursorCircle.style.width = this.isHovering ? '70px' : '40px';
+    this.cursorCircle.style.height = this.isHovering ? '70px' : '40px';
+    this.cursorCircle.style.borderWidth = '2px';
+    this.cursorCircle.style.borderColor = '#165B33';
   }
 
   onClick(e) {
-    // Create click burst effect
-    this.createClickBurst(e.clientX, e.clientY);
+    // Create elegant click ripple
+    this.createClickRipple(e.clientX, e.clientY);
   }
 
   onElementHover(element, isEntering) {
     this.isHovering = isEntering;
+    this.currentHoverElement = isEntering ? element : null;
     
     if (isEntering) {
-      // Expand cursor ring
-      this.cursorRing.style.width = '60px';
-      this.cursorRing.style.height = '60px';
-      this.cursorRing.style.borderWidth = '3px';
+      // Expand and change colors on hover
+      this.cursorDot.style.width = '14px';
+      this.cursorDot.style.height = '14px';
+      this.cursorDot.style.background = '#C41E3A'; // Christmas red
       
-      // Scale up dot
-      this.cursorDot.style.transform = 'translate(-50%, -50%) scale(1.5)';
-      
-      // Add glow effect
-      this.cursorDot.style.boxShadow = `
-        0 0 20px rgba(255, 215, 0, 0.8),
-        0 0 40px rgba(255, 107, 107, 0.6),
-        0 0 60px rgba(78, 205, 196, 0.4)
-      `;
-      
-      this.magneticElement = element;
+      this.cursorCircle.style.width = '70px';
+      this.cursorCircle.style.height = '70px';
+      this.cursorCircle.style.borderColor = '#165B33'; // Forest green
+      this.cursorCircle.style.borderWidth = '2px';
+      this.cursorCircle.style.opacity = '1';
     } else {
-      // Reset to normal
-      this.cursorRing.style.width = '40px';
-      this.cursorRing.style.height = '40px';
-      this.cursorRing.style.borderWidth = '2px';
-      this.cursorDot.style.transform = 'translate(-50%, -50%) scale(1)';
-      this.cursorDot.style.boxShadow = `
-        0 0 10px rgba(255, 215, 0, 0.6),
-        0 0 20px rgba(255, 107, 107, 0.4)
-      `;
+      // Return to normal state
+      this.cursorDot.style.width = '10px';
+      this.cursorDot.style.height = '10px';
+      this.cursorDot.style.background = '#C41E3A';
       
-      this.magneticElement = null;
+      this.cursorCircle.style.width = '40px';
+      this.cursorCircle.style.height = '40px';
+      this.cursorCircle.style.borderColor = '#165B33';
+      this.cursorCircle.style.borderWidth = '2px';
+      this.cursorCircle.style.opacity = '0.8';
     }
   }
 
-  checkMagneticEffect(e) {
-    if (!this.magneticElement) return;
+  applyMagneticEffect() {
+    if (!this.currentHoverElement) return;
 
-    const rect = this.magneticElement.getBoundingClientRect();
+    const rect = this.currentHoverElement.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     
     const distance = Math.sqrt(
-      Math.pow(e.clientX - centerX, 2) + 
-      Math.pow(e.clientY - centerY, 2)
+      Math.pow(this.mouseX - centerX, 2) + 
+      Math.pow(this.mouseY - centerY, 2)
     );
 
-    // Magnetic pull radius
-    const magnetRadius = 100;
+    const magnetRadius = 80;
     
     if (distance < magnetRadius) {
-      // Calculate magnetic force (stronger when closer)
-      const force = (magnetRadius - distance) / magnetRadius;
-      const pullX = (centerX - e.clientX) * force * 0.3;
-      const pullY = (centerY - e.clientY) * force * 0.3;
+      const force = Math.max(0, (magnetRadius - distance) / magnetRadius);
+      const pullStrength = 0.2;
       
-      this.cursorX = e.clientX + pullX;
-      this.cursorY = e.clientY + pullY;
+      this.dotX = this.mouseX + (centerX - this.mouseX) * force * pullStrength;
+      this.dotY = this.mouseY + (centerY - this.mouseY) * force * pullStrength;
     }
   }
 
   createSparkle(x, y) {
+    // Christmas color palette
     const colors = [
+      '#C41E3A', // Christmas red
+      '#165B33', // Forest green
       '#FFD700', // Gold
-      '#FF6B6B', // Red
-      '#4ECDC4', // Teal
       '#FFFFFF', // White
-      '#FFA500', // Orange
-      '#FF1493'  // Pink
+      '#146B3A', // Emerald green
+      '#BB2528'  // Dark red
     ];
 
     const particle = {
-      x: x,
-      y: y,
-      vx: (Math.random() - 0.5) * 2,
-      vy: (Math.random() - 0.5) * 2 - 1, // Slight upward bias
-      size: Math.random() * 3 + 1,
+      x: x + (Math.random() - 0.5) * 20,
+      y: y + (Math.random() - 0.5) * 20,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: (Math.random() - 0.5) * 1.5 - 0.5,
+      size: Math.random() * 2.5 + 1,
       color: colors[Math.floor(Math.random() * colors.length)],
       life: 1.0,
-      decay: Math.random() * 0.02 + 0.01
+      decay: Math.random() * 0.015 + 0.01
     };
 
     this.particles.push(particle);
   }
 
-  createClickBurst(x, y) {
-    // Create burst of particles on click
-    for (let i = 0; i < 12; i++) {
-      const angle = (Math.PI * 2 * i) / 12;
-      const speed = Math.random() * 3 + 2;
+  createClickRipple(x, y) {
+    // Create elegant click burst
+    const burst = 8;
+    for (let i = 0; i < burst; i++) {
+      const angle = (Math.PI * 2 * i) / burst;
+      const speed = Math.random() * 2 + 1.5;
       
       const particle = {
         x: x,
         y: y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: Math.random() * 4 + 2,
-        color: ['#FFD700', '#FF6B6B', '#4ECDC4'][Math.floor(Math.random() * 3)],
+        size: Math.random() * 3 + 2,
+        color: i % 2 === 0 ? '#C41E3A' : '#165B33',
         life: 1.0,
-        decay: 0.02
+        decay: 0.025
       };
       
       this.particles.push(particle);
     }
 
-    // Create click ring effect
-    const clickRing = document.createElement('div');
-    clickRing.style.cssText = `
+    // Create expanding circle ripple
+    const ripple = document.createElement('div');
+    ripple.style.cssText = `
       position: fixed;
       left: ${x}px;
       top: ${y}px;
-      width: 20px;
-      height: 20px;
-      border: 2px solid #FFD700;
+      width: 30px;
+      height: 30px;
+      border: 2px solid #C41E3A;
       border-radius: 50%;
       pointer-events: none;
-      z-index: 99997;
-      animation: clickPulse 0.5s ease-out forwards;
-      box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+      z-index: 999996;
+      animation: clickRipple 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      opacity: 0.8;
     `;
     
-    document.body.appendChild(clickRing);
-    setTimeout(() => clickRing.remove(), 500);
+    document.body.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 600);
+
+    // Secondary green ripple
+    const ripple2 = document.createElement('div');
+    ripple2.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      width: 30px;
+      height: 30px;
+      border: 2px solid #165B33;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 999995;
+      animation: clickRipple 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      opacity: 0.6;
+      animation-delay: 0.1s;
+    `;
+    
+    document.body.appendChild(ripple2);
+    setTimeout(() => ripple2.remove(), 900);
   }
 
   updateParticles() {
@@ -388,63 +413,76 @@ class HolidayCursor extends HTMLElement {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       
-      // Update position
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.1; // Gravity
+      p.vy += 0.08; // Subtle gravity
       p.life -= p.decay;
 
-      // Remove dead particles
       if (p.life <= 0) {
         this.particles.splice(i, 1);
         continue;
       }
 
-      // Draw particle
+      // Draw particle with glow
       this.particleCtx.save();
       this.particleCtx.globalAlpha = p.life;
       
-      // Create gradient for sparkle effect
-      const gradient = this.particleCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+      // Outer glow
+      const gradient = this.particleCtx.createRadialGradient(
+        p.x, p.y, 0,
+        p.x, p.y, p.size * 2
+      );
       gradient.addColorStop(0, p.color);
+      gradient.addColorStop(0.5, p.color + '80');
       gradient.addColorStop(1, 'transparent');
       
       this.particleCtx.fillStyle = gradient;
       this.particleCtx.beginPath();
-      this.particleCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      this.particleCtx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
       this.particleCtx.fill();
       
-      // Add sparkle star effect for some particles
-      if (Math.random() > 0.9) {
-        this.particleCtx.fillStyle = p.color;
-        this.particleCtx.fillRect(p.x - 0.5, p.y - p.size * 1.5, 1, p.size * 3);
-        this.particleCtx.fillRect(p.x - p.size * 1.5, p.y - 0.5, p.size * 3, 1);
-      }
+      // Inner bright core
+      this.particleCtx.fillStyle = p.color;
+      this.particleCtx.beginPath();
+      this.particleCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      this.particleCtx.fill();
       
       this.particleCtx.restore();
     }
   }
 
   animate() {
-    // Smooth cursor follow with easing
-    const ease = 0.15;
-    this.cursorX += (this.mouseX - this.cursorX) * ease;
-    this.cursorY += (this.mouseY - this.cursorY) * ease;
+    // Smooth easing for cursor elements
+    const dotEase = 0.18; // Fast following for dot
+    const circleEase = 0.08; // Slower, elastic following for circle
+    
+    // Update dot position (fast, responsive)
+    this.dotX += (this.mouseX - this.dotX) * dotEase;
+    this.dotY += (this.mouseY - this.dotY) * dotEase;
+    
+    // Update circle position (slow, smooth)
+    this.circleX += (this.mouseX - this.circleX) * circleEase;
+    this.circleY += (this.mouseY - this.circleY) * circleEase;
 
-    // Update cursor position
-    this.cursorDot.style.left = this.cursorX + 'px';
-    this.cursorDot.style.top = this.cursorY + 'px';
-    this.cursorRing.style.left = this.cursorX + 'px';
-    this.cursorRing.style.top = this.cursorY + 'px';
+    // Apply positions
+    this.cursorDot.style.left = this.dotX + 'px';
+    this.cursorDot.style.top = this.dotY + 'px';
+    this.cursorCircle.style.left = this.circleX + 'px';
+    this.cursorCircle.style.top = this.circleY + 'px';
 
     // Update particles
     this.updateParticles();
 
-    // Continue animation
     this.animationId = requestAnimationFrame(() => this.animate());
   }
 
   startAnimation() {
+    // Initialize positions
+    this.dotX = this.mouseX;
+    this.dotY = this.mouseY;
+    this.circleX = this.mouseX;
+    this.circleY = this.mouseY;
+    
     this.animate();
   }
 }
@@ -452,7 +490,7 @@ class HolidayCursor extends HTMLElement {
 // Define the custom element
 customElements.define('holiday-cursor', HolidayCursor);
 
-// Export for module systems (optional)
+// Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = HolidayCursor;
 }
