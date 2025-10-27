@@ -1,9 +1,8 @@
 /**
- * Wix Custom Element: Holiday Cursor (SVG Design)
+ * Wix Custom Element: Holiday Cursor (Fixed Version)
  * Tag name: holiday-cursor
  * 
- * Based on modern cursor design with SVG circles,
- * blend mode effects, and Christmas holiday colors.
+ * Fixed: Proper mouse tracking, scroll handling, and blend mode visibility
  */
 
 class HolidayCursor extends HTMLElement {
@@ -78,19 +77,29 @@ class HolidayCursor extends HTMLElement {
         top: 0;
         left: 0;
         mix-blend-mode: difference;
-        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        will-change: transform;
       }
       
       .holiday-cursor__ball circle {
         transition: fill 0.3s ease;
       }
       
+      /* Normal state - Christmas colors that invert nicely */
       .holiday-cursor__ball--big circle {
-        fill: #C41E3A;
+        fill: #FFFFFF;
       }
       
       .holiday-cursor__ball--small circle {
-        fill: #165B33;
+        fill: #FFFFFF;
+      }
+      
+      /* Hover state - white for maximum visibility with blend mode */
+      .holiday-cursor__ball--big.hovering circle {
+        fill: #FFFFFF;
+      }
+      
+      .holiday-cursor__ball--small.hovering circle {
+        fill: #FFFFFF;
       }
     `;
     document.head.appendChild(styleSheet);
@@ -120,6 +129,10 @@ class HolidayCursor extends HTMLElement {
     this.cursorContainer.appendChild(this.bigBall);
     this.cursorContainer.appendChild(this.smallBall);
     document.body.appendChild(this.cursorContainer);
+
+    // Initialize positions off-screen
+    this.bigBall.style.transform = 'translate(-100px, -100px)';
+    this.smallBall.style.transform = 'translate(-100px, -100px)';
   }
 
   setupEventListeners() {
@@ -175,30 +188,25 @@ class HolidayCursor extends HTMLElement {
   }
 
   onMouseMove(e) {
-    this.mouseX = e.pageX;
-    this.mouseY = e.pageY;
+    // Use clientX/clientY for viewport coordinates (not affected by scroll)
+    this.mouseX = e.clientX;
+    this.mouseY = e.clientY;
   }
 
   onMouseHover() {
     this.targetScale = 4;
     
-    // Change colors on hover for visual feedback
-    const bigCircle = this.bigBall.querySelector('circle');
-    const smallCircle = this.smallBall.querySelector('circle');
-    
-    bigCircle.style.fill = '#FFD700'; // Gold on hover
-    smallCircle.style.fill = '#C41E3A'; // Red on hover
+    // Add hovering class for white color
+    this.bigBall.classList.add('hovering');
+    this.smallBall.classList.add('hovering');
   }
 
   onMouseHoverOut() {
     this.targetScale = 1;
     
-    // Reset colors
-    const bigCircle = this.bigBall.querySelector('circle');
-    const smallCircle = this.smallBall.querySelector('circle');
-    
-    bigCircle.style.fill = '#C41E3A'; // Red (Christmas)
-    smallCircle.style.fill = '#165B33'; // Green (Forest)
+    // Remove hovering class
+    this.bigBall.classList.remove('hovering');
+    this.smallBall.classList.remove('hovering');
   }
 
   animate() {
@@ -217,20 +225,21 @@ class HolidayCursor extends HTMLElement {
     // Update scale with easing
     this.scale += (this.targetScale - this.scale) * scaleEase;
 
-    // Apply transforms
-    this.bigBall.style.transform = `translate(${this.bigBallX - 20}px, ${this.bigBallY - 20}px) scale(${this.scale})`;
-    this.smallBall.style.transform = `translate(${this.smallBallX - 6}px, ${this.smallBallY - 6}px)`;
+    // Apply transforms - using translate3d for better performance
+    // Subtract half of SVG size to center the cursor
+    this.bigBall.style.transform = `translate3d(${this.bigBallX - 20}px, ${this.bigBallY - 20}px, 0) scale(${this.scale})`;
+    this.smallBall.style.transform = `translate3d(${this.smallBallX - 6}px, ${this.smallBallY - 6}px, 0)`;
 
     // Continue animation loop
     this.animationId = requestAnimationFrame(() => this.animate());
   }
 
   startAnimation() {
-    // Initialize positions to avoid jump on load
-    this.bigBallX = this.mouseX;
-    this.bigBallY = this.mouseY;
-    this.smallBallX = this.mouseX;
-    this.smallBallY = this.mouseY;
+    // Initialize positions to current mouse position (or center if not set)
+    this.bigBallX = this.mouseX || window.innerWidth / 2;
+    this.bigBallY = this.mouseY || window.innerHeight / 2;
+    this.smallBallX = this.mouseX || window.innerWidth / 2;
+    this.smallBallY = this.mouseY || window.innerHeight / 2;
     
     this.animate();
   }
